@@ -30,11 +30,11 @@ def run_experiment(train_size, device, model, features_type, random_seed=42, rep
     df = pd.merge(df_all, df_y, left_index=True, right_index=True)
 
     if features_type == "only_features":
-        features = list(df_x.columns) + ["macs"]  # only features 
+        features = list(df_features.columns) + ["macs"]  # only features 
     elif features_type == "only_proxies":
-        features = list(df_x2.columns) + ["params", "flops", "macs"] # only proxies
+        features = list(df_proxies.columns) + ["params", "flops", "macs"] # only proxies
     elif features_type == "features_proxies":
-        features = list(df_x.columns) + list(df_x2.columns) + ["macs"] # features + proxies
+        features = list(df_features.columns) + list(df_proxies.columns) + ["macs"] # features + proxies
     else:
         raise ValueError("unknown features type")
     
@@ -56,10 +56,10 @@ def run_experiment(train_size, device, model, features_type, random_seed=42, rep
 
     for run in range(repeat):
 
-        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, train_size=TRAIN_SIZE, random_state=rng)
+        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, train_size=train_size, random_state=rng)
         energy_score, energy_kendal, energy_feature_importances = train_and_test(X_train, Y_train, X_test, Y_test,
-                                                                                 what=f"{DEVICE}_energy",
-                                                                                 model_type=MODEL,
+                                                                                 what=f"{device}_energy",
+                                                                                 model_type=model,
                                                                                  random_state=rng)
    
         energy_scores[run] = energy_score
@@ -113,7 +113,7 @@ def run_experiment(train_size, device, model, features_type, random_seed=42, rep
 
 result_list = [] 
 for train_size in 11, 25, 55, 124, 276, 614, 1366, 3036, 6748, 15000:
-    for device in "edgepu", "eyeriss", "fpga":
+    for device in "edgegpu", "eyeriss", "fpga":
         for features_type in "only_features", "only_proxies", "features_proxies":
             result = run_experiment(
                 train_size,
