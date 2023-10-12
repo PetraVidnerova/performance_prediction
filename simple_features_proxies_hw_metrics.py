@@ -6,7 +6,12 @@ import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score
 
+from multiprocessing import Pool 
+
+
 from utils import train_and_test
+
+
 
 # TRAIN_SIZE = 1366
 # DEVICE = "edgegpu" # eyeriss, edgegpu, fpga
@@ -22,14 +27,14 @@ def run_experiment(train_size, device, model, features_type, random_seed=42, rep
 
     df_features = pd.read_csv("mydata/simple_features.csv", index_col=0)
     df_proxies = pd.read_csv("mydata/zero_cost_proxies.csv", index_col=0).drop(columns=["params", "flops"])
-    df_macs = pd.read_csv("mydata/network_macs.csv", index_col=0)
+    #    df_macs = pd.read_csv("mydata/network_macs.csv", index_col=0)
     df_one_hot = pd.get_dummies(
         pd.read_csv("mydata/one_hot_features.csv", index_col=0).astype(object)
-    )
+    ).astype(int)
     
     df_features_proxies = pd.merge(df_features, df_proxies, left_index=True, right_index=True)
     df_features_proxies_one_hot = pd.merge(df_features_proxies, df_one_hot, left_index=True, right_index=True)
-    df_all = pd.merge(df_features_proxies_one_hot, df_macs, left_index=True, right_index=True)
+    df_all = df_features_proxies_one_hot
 
     df_y = pd.read_csv("mydata/hw_energy.csv", index_col=0)
 
@@ -128,24 +133,28 @@ setup_list = []
 for train_size in 11, 25, 55, 124, 276, 614, 1366, 3036, 6748, 15000:
     for device in "edgegpu", "eyeriss", "fpga":
         for features_type in "only_one_hot", "features_one_hot", "features_one_hot_proxies":
-            #"only_features", "only_proxies", "features_proxies":
+#        for features_type in "only_features", "only_proxies", "features_proxies":
             setup_list.append(
                 (train_size, device, "XGBRegressor", features_type)
             )
 
-            
-# result_list = [] 
 
-#             result = run_experiment(
-#                 train_size,
-#                 device,
-#                 "XGBRegressor",
-#                 features_type,
-#                 repeat=100
-#             )
-#             result_list.append(result)
-#     df_backup = pd.DataFrame(result_list)
-#     df_backup.to_csv("backup.csv")
+print(setup_list)
 
-# df = pd.DataFrame(result_list)
-# df.to_csv("experiment2_result.csv")
+def evaluate(setup):
+    return run_experiment(*setup, repeat=100)
+
+num_proc = 2
+
+if num_proc > 1:
+    pool = Pool(num_proc)
+    result_list = pool.map(evaluate, setup_list)
+else:
+    result_list = map(evaluate, setup_list)
+
+print(result_list)
+
+df = pd.DataFrame(result_list)
+df.to_csv("test_result.csv")
+
+

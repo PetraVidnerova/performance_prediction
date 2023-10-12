@@ -8,8 +8,12 @@ from sklearn.svm import SVR
 
 from xgboost import XGBRegressor
 
-
-from zc_combine.predictors import xgb_args
+xgb_args = {
+    "tree_method": "hist",
+    "subsample": 0.9,
+    "n_estimators": 10000,
+    "learning_rate": 0.01
+}
 
 
 def train_and_test(X_train, Y_train, X_test, Y_test, what="accuracy", model_type="XGBRegressor", random_state=None):
