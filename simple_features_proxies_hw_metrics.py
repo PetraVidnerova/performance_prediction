@@ -15,26 +15,40 @@ from utils import train_and_test
 
 def run_experiment(train_size, device, model, features_type, random_seed=42, repeat=10):
 
+    print(f"Computing {train_size} {device} {model} {features_type}")
+    
     rng = np.random.RandomState(random_seed)
 
 
     df_features = pd.read_csv("mydata/simple_features.csv", index_col=0)
     df_proxies = pd.read_csv("mydata/zero_cost_proxies.csv", index_col=0).drop(columns=["params", "flops"])
     df_macs = pd.read_csv("mydata/network_macs.csv", index_col=0)
+    df_one_hot = pd.get_dummies(
+        pd.read_csv("mydata/one_hot_features.csv", index_col=0).astype(object)
+    )
+    
     df_features_proxies = pd.merge(df_features, df_proxies, left_index=True, right_index=True)
-    df_all = pd.merge(df_features_proxies, df_macs, left_index=True, right_index=True)
+    df_features_proxies_one_hot = pd.merge(df_features_proxies, df_one_hot, left_index=True, right_index=True)
+    df_all = pd.merge(df_features_proxies_one_hot, df_macs, left_index=True, right_index=True)
 
     df_y = pd.read_csv("mydata/hw_energy.csv", index_col=0)
 
 
     df = pd.merge(df_all, df_y, left_index=True, right_index=True)
 
+    # do not include macs for now
     if features_type == "only_features":
-        features = list(df_features.columns) + ["macs"]  # only features 
+        features = list(df_features.columns)   # only features 
     elif features_type == "only_proxies":
-        features = list(df_proxies.columns) + ["params", "flops", "macs"] # only proxies
+        features = list(df_proxies.columns) + ["params", "flops"] # only proxies
+    elif features_type == "only_one_hot":
+        features = list(df_one_hot.columns)
+    elif features_type == "features_one_hot":
+        features = list(df_one_hot.columns) + list(df_features.columns)
+    elif features_type == "features_one_hot_proxies":
+        features = list(df_one_hot.columns) + list(df_features.columns) + list(df_proxies.columns)        
     elif features_type == "features_proxies":
-        features = list(df_features.columns) + list(df_proxies.columns) + ["macs"] # features + proxies
+        features = list(df_features.columns) + list(df_proxies.columns)  # features + proxies
     else:
         raise ValueError("unknown features type")
     
@@ -44,7 +58,7 @@ def run_experiment(train_size, device, model, features_type, random_seed=42, rep
     
     energies = ["eyeriss_energy", "edgegpu_energy", "fpga_energy"]
 
-
+    
     X = df[features]
     Y = df[energies]
 
@@ -88,7 +102,7 @@ def run_experiment(train_size, device, model, features_type, random_seed=42, rep
 
     df_energy_importance = pd.DataFrame(energy_importances)
     importances = df_energy_importance.describe().loc[["mean", "std"]].T.sort_values(by="mean", ascending=False)
-    importances.to_csv("{device}_{train_size}_{model}_{features_type}_feature_importances.csv")
+    importances.to_csv(f"{device}_{train_size}_{model}_{features_type}_feature_importances.csv")
 
     fig, ax = plt.subplots(figsize=(15,5))
     sns.barplot(df_energy_importance, ax=ax)
@@ -110,20 +124,28 @@ def run_experiment(train_size, device, model, features_type, random_seed=42, rep
     }
     
 
-
-result_list = [] 
+setup_list = [] 
 for train_size in 11, 25, 55, 124, 276, 614, 1366, 3036, 6748, 15000:
     for device in "edgegpu", "eyeriss", "fpga":
-        for features_type in "only_features", "only_proxies", "features_proxies":
-            result = run_experiment(
-                train_size,
-                device,
-                "XGBRegressor",
-                features_type,
-                repeat=100
+        for features_type in "only_one_hot", "features_one_hot", "features_one_hot_proxies":
+            #"only_features", "only_proxies", "features_proxies":
+            setup_list.append(
+                (train_size, device, "XGBRegressor", features_type)
             )
-    df_backup = pd.DataFrame(result_list)
-    df_backup.to_csv("backup.csv")
 
-df = pd.DataFrame(result_list)
-df.to_csv("experiment_result.csv")
+            
+# result_list = [] 
+
+#             result = run_experiment(
+#                 train_size,
+#                 device,
+#                 "XGBRegressor",
+#                 features_type,
+#                 repeat=100
+#             )
+#             result_list.append(result)
+#     df_backup = pd.DataFrame(result_list)
+#     df_backup.to_csv("backup.csv")
+
+# df = pd.DataFrame(result_list)
+# df.to_csv("experiment2_result.csv")
